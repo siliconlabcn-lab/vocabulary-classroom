@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f7f6f1">
+<meta name="description" content="一节完整的英语词汇陪练体验课，包含测评、跟读、回忆和课后三天复习。">
+<title>单词练习室</title>
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body class="logged-out">
+<header class="top">
+  <div class="bar">
+    <div class="brand"><span class="logo" aria-hidden="true">Aa</span><span>单词练习室</span><span class="brand-divider"></span><span class="brand-note">词汇体验课</span></div>
+    <div class="header-actions">
+    <button type="button" class="quiet sound-toggle" data-action="sound" aria-pressed="true">自动播报 · 开</button>
+    <button type="button" class="secondary" id="switch-account" data-action="switch">退出登录</button>
+    </div>
+  </div>
+</header>
+<main class="layout">
+  <aside class="sidebar" aria-label="课堂进度" id="sidebar"></aside>
+  <article class="content" id="classroom" aria-label="词汇课堂">
+    <div class="login-panel" role="status"><h1>正在加载词库</h1><p>首次打开请稍候。若长时间未完成，请刷新网页。</p></div>
+    <noscript>请在浏览器中启用 JavaScript 后重新打开网页。</noscript>
+  </article>
+</main>
+<footer class="recording-footer"><details id="recording-source">
+  <summary>语音来源</summary><p>真人录音与自然合成语音。部分中文释义由真人录音片段拼接，缺失词条使用自然合成语音。全部音频随网站提供，中文只读第一个释义。</p><div id="recording-credits"></div>
+</details></footer>
+<div id="notice" class="toast" role="status"></div>
+<section id="print" aria-label="复习讲义"></section>
+</body>
+</html>

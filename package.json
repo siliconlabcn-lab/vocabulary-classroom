@@ -1,0 +1,8 @@
+{
+  "name": "vocabulary-classroom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check dist/app.js && node --check dist/audio-player.js && node --check dist/audio-library.js"
+  }
+}
