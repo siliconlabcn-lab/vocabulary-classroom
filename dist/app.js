@@ -1,5 +1,5 @@
 import { BANKS, GRADES, WORDS, bankFor } from './words.js';
-import { RECORDINGS } from './recordings.js';
+import { RECORDINGS } from './recordings.js?v=cloud-20261121b';
 import { englishRecording, chineseRecording } from './audio-library.js';
 import { playPronunciation, stopPronunciation } from './audio-player.js';
 import { accountName, registeredKey, validAccountName, verifyPassword } from './accounts.js';

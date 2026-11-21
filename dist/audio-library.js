@@ -1,4 +1,4 @@
-import { RECORDINGS } from './recordings.js';
+import { RECORDINGS } from './recordings.js?v=cloud-20261121b';
 
 export function englishRecording(word) {
   return RECORDINGS.en[word] ?? RECORDINGS.en[word?.toLowerCase()] ?? null;

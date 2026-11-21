@@ -24,6 +24,7 @@
 npm ci --ignore-scripts --no-audit --no-fund
 npm test
 edgeone makers build
+npm run prepare:deploy
 ```
 
 部署 .edgeone 构建产物到原 Makers 项目，保留原域名、工作空间和加速区域。凭据由本机私有环境提供，不写入仓库或前端。先验证预览，再更新生产环境。
