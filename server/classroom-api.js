@@ -83,7 +83,7 @@ export function createClassroomApi(store, { now=Date.now }={}) {
         if (typeof body.name!=='string' || typeof body.password!=='string') fail(400,'请输入姓名和密码。');
         const name=accountName(body.name), password=body.password;
         if (!validAccountName(name) || password.length<8 || password.length>256) fail(400,'姓名最多 60 个字符，密码至少 8 个字符。');
-        await throttle(clientIp,action,action==='register'?8:30,action==='register'?3600000:600000);
+        await throttle(clientIp,action,action==='register'?120:180,action==='register'?3600000:600000);
         const registered=await users(name);
         let user;
         if (action==='register') {
