@@ -1,60 +1,37 @@
-# 国内直连部署
+# 正式部署与记录迁移
 
-网站文件已经就绪；国内托管、正式域名及直连验收尚未完成。GitHub Pages 保留为现有入口。
+正式网址：<https://wordclassroom.cn/>。GitHub Pages 保留旧档案导出和正式站导航。
 
-当前先采用免费临时预览进行无代理真机验证。临时预览有期限与访问限制，不能作为长期共享网址；预览及认领凭据不写入本仓库。下述 CloudBase 配置是后续正式部署的可选准备，并不表示已购买或开通服务。
+网站部署在用户的腾讯云 EdgeOne Makers 项目 wordclassroom，使用现有免费套餐和独立域名，HTTPS 证书由平台自动续签。域名需要按年续费，以注册商当期报价为准。项目使用中国大陆以外的加速区域。
 
-## 推荐部署目标
+## 云端账号和记录
 
-使用腾讯云 CloudBase 静态网站托管，绑定完成备案的自定义域名，并启用 HTTPS。默认测试域名不作为面向学员的长期入口。
+- Cloud Functions 提供注册、登录、注销、档案保存和读取。
+- 服务器验证密码和会话，只允许读取当前已登录学员的数据。
+- 官方 Blob SDK 将数据持久化到当前项目的私有存储，部署更新不会清空档案。
+- 浏览器保存待同步缓存；请求失败不会删除缓存，恢复网络后可重试。
+- 多个设备的课堂按标识合并去重，已学和待学词库合并保存。
 
-注册、实名认证、域名购买与备案需由账号本人办理。托管及域名的具体费用以购买页面为准；尚未开通任何付费资源。
+## 迁移旧档案
 
-## 导入现有仓库
+在当初学习的设备和浏览器中，打开原网址下的 migration.html。验证旧账户密码并导出 JSON 档案，然后在正式网址登录同名云端账户，选择“导入旧记录”。导入会合并当前档案，原网址的数据继续保留，导出文件不包含密码。
 
-在静态网站托管控制台选择 Git 公开仓库部署，使用以下参数：
+正式站的同一浏览器若仍有本机旧账户，可用旧姓名和密码登录进行升级。其他域名的本机数据不能由正式站直接读取；原浏览器数据若被清除，无法恢复此前从未上传的记录。
 
-| 配置 | 值 |
-| --- | --- |
-| 仓库 | `https://github.com/siliconlabcn-lab/vocabulary-classroom.git` |
-| 分支 | `main` |
-| 项目根目录 | 仓库根目录 |
-| 框架 | 纯静态 / static |
-| 安装命令 | 空，跳过安装 |
-| 构建命令 | 空，跳过构建 |
-| 输出目录 | `dist` |
-| 挂载路径 | `/` |
-| 首页 | `index.html` |
-
-`cloudbaserc.json` 已保存以上静态应用设置。取得实际环境 ID 并登录 CloudBase CLI 后，也可执行：
+## 构建与验证
 
 ```sh
-tcb app deploy vocabulary-classroom -e "$CLOUDBASE_ENV_ID"
+npm ci --ignore-scripts --no-audit --no-fund
+npm test
+edgeone makers build
 ```
 
-`CLOUDBASE_ENV_ID` 必须是控制台返回的真实环境 ID；本仓库不存放云账号密钥或登录凭据。
+部署 .edgeone 构建产物到原 Makers 项目，保留原域名、工作空间和加速区域。凭据由本机私有环境提供，不写入仓库或前端。先验证预览，再更新生产环境。
 
-## 发布包与检查
+自动化检查覆盖独立会话同步、账号隔离、错误密码、会话失效、来源校验、旧档案去重，以及断网重试。实际 Windows / Edge 和安卓无代理访问仍需在学员设备验收，命令行直连检查不能替代真机测试。
 
-```sh
-python3 scripts/package-hosting.py
-python3 scripts/verify-public-site.py https://实际部署域名/ --direct
-```
+## 官方说明
 
-发布包在 `.sites/domestic-publish.zip`，仅含网站文件和全部音频。检查脚本会校验页面、词库与中英文录音的内容哈希。
-
-`--direct` 忽略程序代理设置，但不能检测或关闭系统 VPN。报告因此不会自动宣称“国内直连已通过”。
-
-正式切换前，在关闭代理/VPN的实际设备上分别验证：
-
-- Windows / Edge：访问、注册、登录、筛选词数、学习和发音。
-- 安卓 / Chrome 或 Edge：访问、注册、登录、词卡与中英文发音。
-- 至少覆盖目标学员实际使用的家庭宽带与手机流量网络，记录时间、运营商和成功/失败结果。
-
-现有账户与学习记录保存在当前浏览器，切换域名或设备不会自动同步。正式迁移前需另行处理原记录迁移。
-
-## 官方参考
-
-- [部署方式](https://docs.cloudbase.net/hosting/web-hosting)
-- [静态应用部署参数](https://docs.cloudbase.net/cli-v1/app/deploy)
-- [腾讯云备案条件](https://cloud.tencent.com/document/api/243/19630)
+- [Cloud Functions](https://pages.edgeone.ai/document/node-functions)
+- [Blob 持久存储](https://pages.edgeone.ai/zh/document/blob-storage)
+- [免费套餐](https://pages.edgeone.ai/zh/document/billing-free-plan)

@@ -2,8 +2,10 @@ import { BANKS, GRADES, WORDS, bankFor } from './words.js';
 import { RECORDINGS } from './recordings.js';
 import { englishRecording, chineseRecording } from './audio-library.js';
 import { playPronunciation, stopPronunciation } from './audio-player.js';
-import { accountName, createCredentials, registeredKey, validAccountName, verifyPassword } from './accounts.js';
+import { accountName, registeredKey, validAccountName, verifyPassword } from './accounts.js';
 import { ACCOUNT_IDS, LEGACY_STORAGE, PROFILE_STORAGE, newProfile, openProfiles, recordVocabulary } from './profiles.js';
+import { cloudRequest, openCloudProfile } from './cloud-client.js';
+import { mergeProfiles, validateProfile, lessonId } from './profile-data.js';
 import {
   ACTIVITY, BOX_STAGES, DRILLS, STAGES, STAGE_LABELS, beginDaily, beginScreen, chooseTraining,
   createPlan, deferWord, follow, groupFor, judge, move, recommendation, startLesson,
@@ -49,12 +51,42 @@ let toast;
 let busy = false;
 let audioUnavailable = false;
 let wordAudio = null;
+let cloud = null;
+let syncText = '云端账户';
+let syncOkay = false;
+let lessonPrints = new Map();
+
+function syncStatus(text, okay) {
+  syncText = text; syncOkay = okay;
+  const output=document.querySelector('#sync-status');
+  if(output){output.textContent=text;output.dataset.saved=String(okay);}
+}
+
+function rememberLessons() {
+  lessonPrints = new Map([prefs.lesson,...prefs.history].filter(Boolean).map(lesson=>{
+    const {updatedAt,...content}=lesson;return [lessonId(lesson),JSON.stringify(content)];
+  }));
+}
+
+function openAccount(result) {
+  cloud?.close();
+  cloud=openCloudProfile(result.user,result.profile,syncStatus);
+  account={key:cloud.key,entry:{name:result.user.name,profile:cloud.profile},id:result.user.id};
+  prefs=account.entry.profile;s=prefs.lesson;rememberLessons();
+  if(result.needsUpload)cloud.save(prefs,true);
+  showHome=true;formName='';registering=false;
+  update({autoplay:false,jump:true});
+}
 
 function save() {
   if (!account) return;
+  if(s){
+    const {updatedAt,...content}=s;
+    const print=JSON.stringify(content), id=lessonId(s);
+    if(lessonPrints.get(id)!==print){s.updatedAt=Date.now();lessonPrints.set(id,print);}
+  }
   recordVocabulary(prefs, s);
-  try { localStorage.setItem(account.key, JSON.stringify(account.entry)); }
-  catch { notify('浏览器无法保存进度，请在本次打开期间完成练习。'); }
+  cloud?.save(prefs);
 }
 
 function notify(message) {
@@ -141,6 +173,11 @@ function side() {
 }
 
 function login() {
+  if(location.hostname.endsWith('.github.io'))return `<section class="login-panel">
+    ${intro('单词练习室','课堂已迁到正式网址','现在的云端账号和学习记录统一保存在正式课堂。')}
+    <p><a href="https://wordclassroom.cn/">进入正式课堂 wordclassroom.cn</a></p>
+    <p>如果以前在这个网址学习，请先<a href="migration.html">导出本机旧档案</a>，再到正式课堂导入。</p>
+  </section>`;
   return `<section class="login-panel">
     ${intro('单词练习室', registering ? '注册学员账户' : '学员登录',
       registering ? '设置登录姓名和密码，建立自己的学习档案。' : '输入注册时使用的姓名和密码。')}
@@ -156,8 +193,8 @@ function login() {
         ${button(registering ? '返回登录' : '注册新账户', 'account-mode', 'secondary')}
       </div>
     </form>
-    <p class="local-note">账户和学习记录保存在当前浏览器。</p>
-    <p class="local-note">原 A–G 学员首次注册时，用原字母作为账户姓名，即可接续本机旧档案。</p>
+    <p class="local-note">账号和学习记录保存在云端，安卓、Windows 可登录同一账户继续学习。</p>
+    <p class="local-note">本机旧账户使用原姓名和密码登录，可升级为云端账户。<a href="migration.html">迁移临时网址的旧记录</a></p>
   </section>`;
 }
 
@@ -191,29 +228,30 @@ async function submitAccount(form) {
         showError('这个账户姓名已注册，请直接登录或使用其他姓名。');
         return;
       }
-      const credentials = await createCredentials(password);
-      if (!form.isConnected) return;
-      if (readStorage(key)) {
-        showError('这个账户姓名已注册，请返回登录。');
-        return;
-      }
-      entry = { name, credentials, profile: startingProfile(name) };
-      localStorage.setItem(key, JSON.stringify(entry));
-    } else if (!entry || !await verifyPassword(password, entry.credentials)) {
-      showError('账户姓名或密码不正确。');
-      return;
     }
-
+    let result;
+    if(registering)result=await cloudRequest('register',{name,password,profile:startingProfile(name)});
+    else {
+      let legacyValid=entry?.credentials && await verifyPassword(password,entry.credentials);
+      try {result=await cloudRequest('login',{name,password});}
+      catch(error){
+        if(error.status!==401 || !legacyValid)throw error;
+        result=await cloudRequest('register',{name,password,profile:validateProfile(entry.profile)});
+      }
+      if(legacyValid && !readStorage(`vocabulary-classroom-upgraded:${result.user.id}`)){
+        result.profile=mergeProfiles([result.profile,validateProfile(entry.profile)]);
+        result.needsUpload=true;
+      }
+    }
     if (!form.isConnected) return;
-    account = { key, entry };
-    prefs = entry.profile;
-    s = prefs.lesson;
-    showHome = true;
-    formName = '';
-    registering = false;
-    update({ autoplay: false, jump: true });
-  } catch {
-    showError('当前浏览器无法验证或保存账户。请在本机课堂的浏览器页面中重试。');
+    openAccount(result);
+    if(entry?.profile){
+      await cloud.flush();
+      localStorage.setItem(`vocabulary-classroom-upgraded:${result.user.id}`,'1');
+    }
+  } catch(error) {
+    if(form.isConnected)showError(error.message || '云端登录失败，请稍后重试。');
+    else notify('本机旧记录尚未同步成功，请点击“同步记录”重试。');
   } finally {
     submit.disabled = false;
   }
@@ -231,7 +269,13 @@ function studentRecords() {
     return `<div class="record"><div><strong>${label} · ${GRADES[lesson.grade].name}</strong><p>${subtitle}</p></div>
       ${button(lesson.completedAt ? '查看成绩' : '继续学习', 'record', 'secondary', `data-index="${index}"`)}</div>`;
   }).join('');
-  return `<section class="panel">
+  return `<section class="panel account-storage">
+    <h2>我的云端档案</h2><p id="sync-status" role="status" data-saved="${syncOkay}">${escape(syncText)}</p>
+    <p>换设备后，用同一个姓名和密码登录。开始另一台设备的学习前，请先同步。</p>
+    <div class="buttons">${button('同步记录','sync','secondary')}${button('导出备份','export-profile','secondary')}${button('导入旧记录','import-profile','secondary')}</div>
+    <input type="file" id="profile-file" accept="application/json,.json" hidden>
+    <p class="local-note"><a href="migration.html">临时网址旧记录迁移说明</a></p>
+  </section><section class="panel">
     <h2>我的词库</h2>
     <div class="libraries">
       ${[['待学词库', prefs.pending, '暂未选入或尚未完成的生词。下一次筛词时优先带入。'],
@@ -264,7 +308,7 @@ function home() {
         <span><strong>${grade.name}</strong><small>建议 ${grade.total} 个生词</small></span></label>`).join('')}
       </fieldset>
       ${bankPicker(prefs.preferredBank, '', true)}
-      <div class="setup-foot"><p>口头作答，学生自评或由老师代判。课堂进度保存在当前浏览器。</p>
+      <div class="setup-foot"><p>口头作答，学生自评或由老师代判。课堂进度自动保存到云端。</p>
         <div class="buttons">
         ${prefs.lesson ? button('新开一课','start','secondary') + button(prefs.lesson.completedAt ? '查看上节课报告' : '继续上节课','resume') : button('开始摸底 →','start')}
         </div>
@@ -563,7 +607,22 @@ async function copyFeedback() {
   }
 }
 
-document.addEventListener('change', event => {
+document.addEventListener('change', async event => {
+  if(event.target.id==='profile-file'){
+    const file=event.target.files[0];if(!file)return;
+    try{
+      if(file.size>1024*1024)throw new Error('档案文件超过 1MB。');
+      const data=JSON.parse(await file.text());
+      if(data.format!=='wordclassroom-profile-v1')throw new Error('请选择单词课堂导出的档案文件。');
+      if(accountName(data.name).toLowerCase()!==accountName(account.entry.name).toLowerCase())throw new Error('档案姓名与当前账户不同，请先登录对应账户。');
+      const imported=validateProfile(data.profile);
+      if(!confirm(`将“${data.name}”的旧记录合并到当前云端账户？现有记录会保留。`))return;
+      prefs=mergeProfiles([imported,prefs]);account.entry.profile=prefs;s=prefs.lesson;rememberLessons();
+      save();await cloud.flush();update({autoplay:false,message:'旧记录已合并并保存到云端。'});
+    }catch(error){notify(error.message || '档案导入失败。');}
+    finally{event.target.value='';}
+    return;
+  }
   if (event.target.name === 'grade') {
     prefs.grade = Number(event.target.value);
     save();
@@ -614,7 +673,7 @@ document.addEventListener('submit', event => {
   }
 });
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   const target = event.target.closest('[data-action]');
   if (!target) return;
   switch (target.dataset.action) {
@@ -626,6 +685,10 @@ document.addEventListener('click', event => {
       break;
     case 'switch':
       save();
+      target.disabled=true;
+      try{await cloud?.flush();await cloudRequest('logout',{});}catch{notify('未同步的记录仍在本机，下次登录可重试。');}
+      cloud?.close();cloud=null;
+      target.disabled=false;
       account = null;
       prefs = null;
       s = null;
@@ -637,6 +700,22 @@ document.addEventListener('click', event => {
       notice.textContent = '';
       update({ autoplay: false, jump: true });
       break;
+    case 'sync':
+      target.disabled=true;
+      try{
+        save();const refreshed=await cloud.refresh();
+        prefs=refreshed;account.entry.profile=prefs;s=prefs.lesson;rememberLessons();
+        update({autoplay:false,message:'云端记录已同步。'});
+      }catch(error){notify(error.message);}finally{target.disabled=false;}
+      break;
+    case 'export-profile': {
+      const data={format:'wordclassroom-profile-v1',name:account.entry.name,exportedAt:Date.now(),profile:prefs};
+      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download=`单词课堂-${account.entry.name.replace(/[^\p{L}\p{N}]/gu,'_')}-学习档案.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+      break;
+    }
+    case 'import-profile':
+      document.querySelector('#profile-file').click();break;
     case 'sound':
       prefs.auto = !prefs.auto;
       if (!prefs.auto) stopSound();
@@ -734,3 +813,4 @@ document.addEventListener('keydown', event => {
 });
 
 render();
+cloudRequest('session').then(result=>{if(!account && !document.querySelector('#account-name')?.value)openAccount(result);}).catch(()=>{});

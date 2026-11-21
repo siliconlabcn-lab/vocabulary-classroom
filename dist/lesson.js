@@ -46,7 +46,7 @@ export function startLesson(grade) {
   const count = 12 / tiers.length;
   const queue = tiers.flatMap(tier => shuffle(TRIAL_BANKS[tier].words).slice(0, count).map(word => word.en));
   return {
-    grade, bank, stage: 'check', queue, pos: 0, round: 1, drill: 0, aid: null,
+    id: crypto.randomUUID(), grade, bank, stage: 'check', queue, pos: 0, round: 1, drill: 0, aid: null,
     diagnostic: {}, seen: {}, picked: [], trained: [], groups: [], group: 0,
     box: { green: [], red: [] }, post: {}, daily: [],
     starred: [], deferred: [], startedAt: Date.now(), completedAt: null, time: '19:00',

@@ -4,6 +4,7 @@
 .env.*
 !.env.example
 node_modules/
+.edgeone/
 __pycache__/
 *.pyc
 单词练习室-离线版.html
