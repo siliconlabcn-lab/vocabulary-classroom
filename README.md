@@ -26,6 +26,8 @@ python3 -m http.server 4291 --directory dist
 全部页面、词库与音频使用相对路径，适用于带仓库子路径的 GitHub Pages 地址。
 安卓用户可在 Chrome、Edge 等现代浏览器中使用；首次播放如未自动开始，可点击发音按钮。
 
+国内无代理访问尚未实测完成；正式国内托管的配置与验收步骤见 [国内直连部署](DEPLOYMENT-CN.md)。
+
 ## 音频来源
 
 真人录音的作者、来源和许可证见页面底部“语音来源”以及 `dist/recordings.js` 中的逐条归属记录。
