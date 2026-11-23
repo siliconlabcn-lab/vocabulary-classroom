@@ -13,7 +13,7 @@ export const DRILLS = [
 
 export const ACTIVITY = {
   check: ['词汇摸底', '听英文，口头读出这个词，再说它的中文意思。'],
-  screen: ['学前筛词', '把不会的词加入候选，老师决定从中选几个开练。'],
+  screen: ['学前筛词', '认识的词存入词汇小金库；不会、没想起和未筛选的词留在待学习的词库。'],
   learn: ['单词识记', '先听示范，然后照着重复。'],
   groupReview: ['本组复习', '看英文，说出英文和中文。这组会顺读一遍，再倒序读一遍。'],
   listen: ['听音识词', '先别看词形。听音后说出英文和中文。'],
@@ -75,7 +75,7 @@ export function beginScreen(s, reference = s.bank, pending = [], learned = [], u
   const wanted = new Set(words.map(word => word.en));
   const excluded = new Set([...learned, ...s.trained]);
   s.picked = [...new Set([...pending, ...s.picked])].filter(word =>
-    !excluded.has(word) && (bank.group === '基础词库' || wanted.has(word)));
+    !excluded.has(word) && wanted.has(word));
   const skipped = new Set([...excluded, ...s.picked, ...Object.keys(s.seen)]);
   const wrong = new Set(Object.keys(s.diagnostic).filter(word => !s.diagnostic[word]));
   const pool = [...wanted].filter(word => !skipped.has(word));
@@ -105,7 +105,7 @@ function screenAnswer(s, correct) {
   if (!correct && !s.picked.includes(word)) s.picked.push(word);
   s.pos++;
   if (s.pos === s.queue.length) move(s, 'screenReady');
-  return { message: correct ? '这个词已经会了，继续筛选。' : '已加入候选生词。' };
+  return { message: correct ? '已存入词汇小金库。' : '已加入待学习的词库。' };
 }
 
 function finishBox(s) {
@@ -159,7 +159,10 @@ function advance(s) {
     move(s, 'plan');
   } else if (s.stage === 'daily') {
     s.daily[s.day - 1].completedAt = Date.now();
-    move(s, 'report');
+    if (s.kind === 'vaultReview') {
+      s.completedAt = s.daily[0].completedAt;
+      move(s, 'reviewDone');
+    } else move(s, 'report');
   }
 }
 
@@ -218,6 +221,10 @@ export function deferWord(s) {
   if (s.aid?.step !== 2) return {};
   const word = s.queue[s.pos];
   if (!s.deferred.includes(word)) s.deferred.push(word);
+  if (s.stage === 'daily') {
+    const day = s.daily[s.day - 1];
+    day.skipped = [...new Set([...(day.skipped || []), word])];
+  }
   s.aid = null;
   advance(s);
   return { message: '已记入待巩固，接着练下一个。' };
@@ -236,6 +243,16 @@ export function createPlan(s, time) {
 }
 
 export function beginDaily(s, day) {
+  if (!s.daily[day - 1] || s.daily[day - 1].completedAt) return false;
   s.day = day;
   move(s, 'daily', shuffle(s.trained));
+  return true;
+}
+
+export function startVaultReview(grade, words) {
+  const s = startLesson(grade);
+  Object.assign(s, { kind: 'vaultReview', trained: [...words], day: 1,
+    daily: [{due:Date.now(),missed:[],skipped:[],completedAt:null}] });
+  move(s, 'daily', shuffle(words));
+  return s;
 }

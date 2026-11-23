@@ -76,7 +76,7 @@ export function createClassroomApi(store, { now=Date.now }={}) {
       if (!sameSiteOrigin || fetchSite==='cross-site') fail(403,'请在当前网站内操作。');
       if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415,'请求格式不正确。');
       const text=await request.text();
-      if (Buffer.byteLength(text)>1024*1024) fail(413,'档案超过大小限制，请联系老师处理。');
+      if (Buffer.byteLength(text)>8*1024*1024) fail(413,'档案超过大小限制，请联系老师处理。');
       let body; try { body=JSON.parse(text); } catch { fail(400,'请求格式不正确。'); }
       if (!body || typeof body!=='object' || Array.isArray(body)) fail(400,'请求格式不正确。');
       if (action==='register' || action==='login') {

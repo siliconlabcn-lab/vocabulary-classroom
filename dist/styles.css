@@ -228,6 +228,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .libraries { grid-template-columns: 1fr; }
 }
 .choose-count { margin-right: auto; }
+.vault-libraries { grid-template-columns: 1fr; gap: 14px; }
+.vault-libraries details { min-width: 0; border-left: 4px solid #b9c9fb; }
+.vault-libraries .library-gold { border-left-color: #d69b1c; background: #fffbec; }
+.vault-libraries .library-review { border-left-color: #478a67; }
+.vault-libraries .pills > span { max-width: 100%; overflow-wrap: anywhere; font-size: 16px; }
+.vault-libraries .pills small { font-size: 14px; }
+.vault-libraries summary { font-size: 16px; }
+.vault-libraries .pills button { display: block; font-size: 14px; min-height: 40px; }
+.library-search { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.library-search input { min-height: 44px; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; }
+.vocabulary-panel .choice-actions p, .vault-libraries p { font-size: 14px; }
 
 .bank-picker { display: grid; gap: 8px; margin: 13px 0; justify-items: start; }
 .bank-picker .field { margin: 3px 0; flex-wrap: wrap; }

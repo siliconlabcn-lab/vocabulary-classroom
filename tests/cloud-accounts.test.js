@@ -4,6 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { createClassroomApi } from '../server/classroom-api.js';
 import { emptyProfile, mergeProfiles, validateProfile } from '../dist/profile-data.js';
 import { startLesson } from '../dist/lesson.js';
+import { startVaultReview, judge } from '../dist/lesson.js';
+import { recordVocabulary } from '../dist/profiles.js';
+import { repetitionCount } from '../dist/vocabulary.js';
 
 function memoryStore(){
   const data=new Map();return {data,async get(key){return structuredClone(data.get(key)??null);},async setJSON(key,value){data.set(key,structuredClone(value));},async delete(key){data.delete(key);},async list({prefix,limit=Infinity}){return {blobs:[...data.keys()].filter(key=>key.startsWith(prefix)).sort().slice(0,limit).map(key=>({key}))};}};
@@ -16,6 +19,24 @@ function client(api,cookie=''){
   };
 }
 const password='Synthetic-only-Account-9876';
+test('cloud API retains vault categories, resumes a review, and merges independent device rounds exactly once',async()=>{
+  const api=createClassroomApi(memoryStore()),a=client(api),b=client(api);
+  await a('register',{name:'小金库云端测试',password});await b('login',{name:'小金库云端测试',password});
+  const p=emptyProfile();p.lesson=startLesson(1);p.lesson.trained=['apple'];p.lesson.completedAt=Date.now();p.lesson.seen={blue:true,banana:false};
+  recordVocabulary(p,p.lesson);
+  await a('profile',{writer:randomUUID(),profile:p});
+  const fromB=(await b('session')).data.profile;
+  assert.ok(fromB.learned.includes('blue'));assert.ok(fromB.review.includes('apple'));assert.ok(fromB.pending.includes('banana'));
+  const aProfile=structuredClone(fromB),bProfile=structuredClone(fromB);
+  for(const profile of [aProfile,bProfile]){profile.reviewSession=startVaultReview(1,['apple']);judge(profile.reviewSession,true);recordVocabulary(profile,profile.reviewSession);}
+  const writerA=randomUUID();await a('profile',{writer:writerA,profile:aProfile});await a('profile',{writer:writerA,profile:aProfile});
+  await b('profile',{writer:randomUUID(),profile:bProfile});
+  const merged=(await a('session')).data.profile;
+  assert.equal(repetitionCount(merged,'apple'),3);assert.ok(merged.review.includes('apple'));assert.ok(merged.learned.includes('blue'));
+  merged.reviewSession=startVaultReview(1,['apple']);
+  await a('profile',{writer:writerA,profile:merged});
+  assert.equal((await b('session')).data.profile.reviewSession.stage,'daily');
+});
 test('two independent browser sessions share lessons; stale device cannot erase other records',async()=>{
   const store=memoryStore(),api=createClassroomApi(store),a=client(api),b=client(api);
   assert.equal((await a('register',{name:'共享测试',password})).status,201);
