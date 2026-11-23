@@ -1,4 +1,4 @@
-import { WORDS } from './words.js';
+import { WORDS } from './words.js?v=20261123';
 
 export const ACCOUNT_IDS = [...'ABCDEFG'];
 export const PROFILE_STORAGE = 'vocabulary-classroom-profiles-v1';

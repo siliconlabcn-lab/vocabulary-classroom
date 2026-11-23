@@ -1,15 +1,16 @@
-import { BANKS, GRADES, WORDS, bankFor } from './words.js';
-import { RECORDINGS } from './recordings.js?v=cloud-20261121b';
-import { englishRecording, chineseRecording } from './audio-library.js';
+import { BANKS, GRADES, WORDS, bankFor } from './words.js?v=20261123';
+import { RECORDINGS } from './recordings.js?v=20261123';
+import { englishRecording, chineseRecording } from './audio-library.js?v=20261123';
 import { playPronunciation, stopPronunciation } from './audio-player.js';
 import { accountName, registeredKey, validAccountName, verifyPassword } from './accounts.js';
-import { ACCOUNT_IDS, LEGACY_STORAGE, PROFILE_STORAGE, newProfile, openProfiles, recordVocabulary } from './profiles.js';
+import { ACCOUNT_IDS, LEGACY_STORAGE, PROFILE_STORAGE, newProfile, openProfiles, recordVocabulary } from './profiles.js?v=20261123';
 import { cloudRequest, openCloudProfile } from './cloud-client.js';
 import { mergeProfiles, validateProfile, lessonId } from './profile-data.js';
+import { classroomDay, dailyVocabulary } from './daily-sheet.js';
 import {
   ACTIVITY, BOX_STAGES, DRILLS, STAGES, STAGE_LABELS, beginDaily, beginScreen, chooseTraining,
   createPlan, deferWord, follow, groupFor, judge, move, recommendation, startLesson,
-} from './lesson.js';
+} from './lesson.js?v=20261123';
 
 const root = document.querySelector('#classroom');
 const sidebar = document.querySelector('#sidebar');
@@ -44,6 +45,8 @@ let formName = '';
 let prefs = null;
 let s = null;
 let showHome = true;
+let showReview = false;
+let sheetDay = classroomDay();
 let reveal = false;
 let clock;
 let deadline;
@@ -193,8 +196,7 @@ function login() {
         ${button(registering ? '返回登录' : '注册新账户', 'account-mode', 'secondary')}
       </div>
     </form>
-    <p class="local-note">账号和学习记录保存在云端，安卓、Windows 可登录同一账户继续学习。</p>
-    <p class="local-note">本机旧账户使用原姓名和密码登录，可升级为云端账户。<a href="migration.html">迁移临时网址的旧记录</a></p>
+    <p class="login-guidance">学员登陆使用请点复习巩固，开新课请找老师</p>
   </section>`;
 }
 
@@ -293,6 +295,7 @@ function home() {
         <span class="eyebrow"><span class="dot"></span> 学员 ${escape(account.entry.name)}</span>
         <h1>跟读、回忆，<br>把生词变成熟词。</h1>
         <p>先摸清自己认识哪些词，再跟着陪练开口。从第一轮跟读到课后三天复习，都在这里完成。</p>
+        <div class="buttons">${button('复习巩固','review-hub')}</div>
       </div>
       <div class="tiles" aria-hidden="true">
         <div class="tile tile-back"><b>Recall.</b></div>
@@ -310,11 +313,29 @@ function home() {
       ${bankPicker(prefs.preferredBank, '', true)}
       <div class="setup-foot"><p>口头作答，学生自评或由老师代判。课堂进度自动保存到云端。</p>
         <div class="buttons">
-        ${prefs.lesson ? button('新开一课','start','secondary') + button(prefs.lesson.completedAt ? '查看上节课报告' : '继续上节课','resume') : button('开始摸底 →','start')}
+        ${button('老师开新课','start','secondary')}${prefs.lesson ? button(prefs.lesson.completedAt ? '查看上节课报告' : '继续上节课','resume','secondary') : ''}
         </div>
       </div>
     </section>
-    ${studentRecords()}`;
+    ${dailyPrintPanel()}${studentRecords()}`;
+}
+
+function dailyPrintPanel() {
+  const sheet=dailyVocabulary(prefs,sheetDay,WORDS);
+  return `<section class="panel daily-print"><h2>当天课程合并打印</h2><p>将当天已完成的新课合并成一张词汇表，重复单词只列一次。</p>
+    <div class="print-options"><label class="field">上课日期（北京时间）<input id="sheet-day" type="date" value="${escape(sheetDay)}" required></label>
+    <label class="field">打印内容<select id="daily-sheet-mode"><option value="both">中英文对照</option><option value="en">仅英文</option><option value="zh">仅中文</option></select></label></div>
+    <p id="daily-sheet-summary">${sheet.lessonCount} 节已完成课程 · ${sheet.rows.length} 个词汇</p>
+    ${button('预览并打印当天词汇表','print-day','secondary',sheet.rows.length?'':'disabled')}
+    ${!sheet.rows.length?'<p class="local-note">所选日期还没有已完成新课的训练词汇。</p>':''}</section>`;
+}
+
+function reviewHub() {
+  const records=[prefs.lesson,...prefs.history];
+  const completed=records.map((lesson,index)=>({lesson,index})).filter(({lesson})=>lesson?.completedAt);
+  return `${intro('词汇积累小达人','复习巩固','选择已经上完的课程，继续三天复习或查看需要巩固的词。')}
+    <section class="panel">${completed.length?completed.map(({lesson,index})=>`<div class="record"><div><strong>${recordDate.format(lesson.completedAt)} · ${lesson.trained.length} 个词汇</strong><p>已复习 ${lesson.daily.filter(day=>day.completedAt).length} 天</p></div>${button('复习这节课','review-record','secondary',`data-index="${index}"`)}</div>`).join(''):'<p>还没有已完成的课程。开新课请找老师。</p>'}</section>
+    ${dailyPrintPanel()}${button('返回学员首页','home','secondary')}`;
 }
 
 function intro(label, title, detail) {
@@ -479,7 +500,7 @@ function report() {
   const missed = s.trained.filter(word => !s.post[word]);
   const finished = s.daily.filter(day => day.completedAt).length;
   const focus = [...new Set([...missed, ...s.starred, ...s.deferred])];
-  return `${intro('课堂报告',finished === 3 ? '三天复习已完成' : '体验课已完成','复习安排、当堂检测和需要巩固的词都在这里。')}
+  return `${intro('课堂报告',finished === 3 ? '三天复习已完成' : '词汇积累小达人 · 本课已完成','复习安排、当堂检测和需要巩固的词都在这里。')}
     <div class="metrics">
       <div><span>摸底认识</span><strong>${numberCorrect(s.diagnostic)}<small> / 12</small></strong></div>
       <div><span>学后答对</span><strong>${correct}<small> / ${s.trained.length}</small></strong></div>
@@ -532,7 +553,7 @@ function render() {
   accountToggle.textContent = '退出登录';
   soundToggle.textContent = `自动播报 · ${prefs.auto ? '开' : '关'}`;
   soundToggle.setAttribute('aria-pressed', prefs.auto);
-  if (showHome) root.innerHTML = home();
+  if (showHome) root.innerHTML = showReview ? reviewHub() : home();
   else {
     root.innerHTML = ({ checkReport, plan, report, empty, screenReady, chooseBank }[s.stage] || exercise)();
     if (busy) setBusy(true);
@@ -581,11 +602,23 @@ function printSheet() {
   window.print();
 }
 
+function previewDailySheet() {
+  const sheet=dailyVocabulary(prefs,sheetDay,WORDS);
+  if(!sheet.rows.length){notify('所选日期没有可打印的已完成课程。');return;}
+  const mode=document.querySelector('#daily-sheet-mode').value,en=mode!=='zh',zh=mode!=='en';
+  const html=`<h1>词汇积累小达人 · 当天词汇表</h1><p>学员：${escape(account.entry.name)}　日期：${escape(sheet.day)}（北京时间）</p><p>${sheet.lessonCount} 节新课合并 · ${sheet.rows.length} 个词汇 · ${en&&zh?'中英文对照':en?'看英文，写中文':'看中文，写英文'}</p>
+    <table class="vocabulary-table"><thead><tr><th>序号</th><th>${en?'单词':'英文默写'}</th><th>${zh?'中文释义':'中文默写'}</th></tr></thead><tbody>${sheet.rows.map((word,index)=>`<tr><td>${index+1}</td><td>${en?escape(word.en):'________________'}</td><td>${zh?escape(word.zh):'________________'}</td></tr>`).join('')}</tbody></table>`;
+  paper.innerHTML=html;
+  const dialog=document.querySelector('#sheet-preview');
+  dialog.innerHTML=`<div class="preview-actions">${button('打印 / 存为 PDF','confirm-day-print')}${button('关闭预览','close-sheet','secondary')}</div><div class="sheet-content">${html}</div>`;
+  dialog.showModal();
+}
+
 async function copyFeedback() {
   const lesson = s;
   const correct = numberCorrect(s.post);
   const summary = [
-    '英语词汇体验课反馈',
+    '词汇积累小达人学习反馈',
     `摸底认识 ${numberCorrect(s.diagnostic)} / 12 个示例词。`,
     `课堂练习了 ${s.trained.length} 个学前不熟悉的词，学后首次答对 ${correct} 个，正确率 ${percent(correct, s.trained.length)}。`,
     `待巩固：${[...new Set([...s.trained.filter(word => !s.post[word]), ...s.starred, ...s.deferred])].map(word => `${word}（${WORDS[word].zh}）`).join('、') || '暂无'}。`,
@@ -608,6 +641,11 @@ async function copyFeedback() {
 }
 
 document.addEventListener('change', async event => {
+  if(event.target.id==='sheet-day'){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(event.target.value))return;
+    sheetDay=event.target.value;
+    const panel=event.target.closest('.daily-print');panel.outerHTML=dailyPrintPanel();return;
+  }
   if(event.target.id==='profile-file'){
     const file=event.target.files[0];if(!file)return;
     try{
@@ -694,6 +732,7 @@ document.addEventListener('click', async event => {
       s = null;
       registering = false;
       showHome = true;
+      showReview = false;
       paper.replaceChildren();
       clearTimeout(toast);
       notice.classList.remove('visible');
@@ -728,6 +767,7 @@ document.addEventListener('click', async event => {
       else playRecordings(['apple', 'friend'].map(englishRecording).filter(Boolean));
       break;
     case 'start':
+      showReview = false;
       if (prefs.lesson) prefs.history.unshift(prefs.lesson);
       s = startLesson(prefs.grade);
       prefs.lesson = s;
@@ -745,8 +785,22 @@ document.addEventListener('click', async event => {
     case 'home':
       s = prefs.lesson;
       showHome = true;
+      showReview = false;
       update({ autoplay: false, jump: true });
       break;
+    case 'review-hub':
+      showHome=true;showReview=true;update({autoplay:false,jump:true});break;
+    case 'review-record':
+      s=[prefs.lesson,...prefs.history][Number(target.dataset.index)];
+      if(!s?.completedAt)break;
+      if(!s.daily.length)createPlan(s,s.time || '19:00');
+      showHome=false;update({autoplay:false,jump:true});break;
+    case 'print-day':
+      previewDailySheet();break;
+    case 'confirm-day-print':
+      window.print();break;
+    case 'close-sheet':
+      document.querySelector('#sheet-preview').close();break;
     case 'choose-bank':
       move(s, 'chooseBank');
       update({ autoplay: false, jump: true });

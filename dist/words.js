@@ -1,4 +1,5 @@
 import { REFERENCE_BANKS } from './reference-banks.js';
+import { CURRICULUM_BANKS } from './curriculum-banks.js';
 
 const banks = [
   ['小学基础', `
@@ -20,7 +21,7 @@ intuition 直觉|ambiguity 歧义|constraint 限制|inference 推断|coincidence
 
 export const TRIAL_BANKS = banks.map(([label, entries], index) => ({
   id: `trial-${index}`,
-  group: '体验词库',
+  group: '基础词库',
   label,
   words: entries.trim().split('|').map(entry => {
     const [en, zh] = entry.split(' ');
@@ -28,7 +29,7 @@ export const TRIAL_BANKS = banks.map(([label, entries], index) => ({
   }),
 }));
 
-export const BANKS = [...TRIAL_BANKS, ...REFERENCE_BANKS.map(({ entries, ...bank }) => ({
+export const BANKS = [...TRIAL_BANKS, ...[...CURRICULUM_BANKS,...REFERENCE_BANKS].map(({ entries, ...bank }) => ({
   ...bank,
   words: entries.map(([en, zh]) => ({ en, zh })),
 }))];

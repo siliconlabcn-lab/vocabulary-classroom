@@ -184,6 +184,26 @@ textarea { width: 100%; min-height: 120px; margin-top: 14px; }
 .account-form input { width: 100%; min-height: 44px; border: 1px solid #d9deea; border-radius: 8px; padding: 8px 11px; margin-bottom: 6px; background: #fff; color: var(--ink); }
 .account-form .buttons { margin-top: 8px; }
 #password-help, .local-note { color: var(--muted); font-size: 12px; }
+.login-guidance { font-size: 15px; line-height: 1.7; color: var(--ink); }
+.welcome .buttons { margin-top: 18px; }
+.print-options { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; }
+.print-options input { min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+#sheet-preview { width: min(880px,94vw); max-height: 90vh; overflow: auto; padding: 24px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); }
+#sheet-preview::backdrop { background: #15244588; }
+.preview-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+.sheet-content { background: white; }
+.vocabulary-table { border-collapse: collapse; width: 100%; margin-top: 18px; font-size: 15px; }
+.vocabulary-table th, .vocabulary-table td { border: 1px solid #c8cfdb; text-align: left; padding: 8px 10px; overflow-wrap: anywhere; }
+.vocabulary-table th:first-child { width: 55px; }
+.vocabulary-table th:nth-child(2) { width: 35%; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  #print h1 { font-size: 20px; }
+  #print .vocabulary-table { font-size: 11pt; }
+  #print .vocabulary-table thead { display: table-header-group; }
+  #print .vocabulary-table tr { break-inside: avoid; }
+  #print .vocabulary-table th, #print .vocabulary-table td { padding: 5px 8px; }
+}
 #account-error { color: #853d39; border-radius: 8px; background: #fff1ec; padding: 8px 11px; font-size: 13px; }
 .libraries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .libraries > details { padding: 12px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }

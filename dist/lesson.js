@@ -1,4 +1,4 @@
-import { GRADES, TRIAL_BANKS, bankFor } from './words.js';
+import { GRADES, TRIAL_BANKS, bankFor } from './words.js?v=20261123';
 
 export const STAGES = ['check', 'screen', 'learn', 'box', 'post', 'review'];
 export const STAGE_LABELS = ['词汇摸底', '学前筛词', '分组训练', '纸盒与混组', '学后检测', '课后三天复习'];
@@ -75,7 +75,7 @@ export function beginScreen(s, reference = s.bank, pending = [], learned = [], u
   const wanted = new Set(words.map(word => word.en));
   const excluded = new Set([...learned, ...s.trained]);
   s.picked = [...new Set([...pending, ...s.picked])].filter(word =>
-    !excluded.has(word) && (bank.group === '体验词库' || wanted.has(word)));
+    !excluded.has(word) && (bank.group === '基础词库' || wanted.has(word)));
   const skipped = new Set([...excluded, ...s.picked, ...Object.keys(s.seen)]);
   const wrong = new Set(Object.keys(s.diagnostic).filter(word => !s.diagnostic[word]));
   const pool = [...wanted].filter(word => !skipped.has(word));

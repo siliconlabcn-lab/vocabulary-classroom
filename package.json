@@ -5,7 +5,7 @@
   "scripts": {
     "prepare:deploy": "python3 scripts/prepare-cloud-audio.py",
     "check": "node --check dist/app.js && node --check dist/audio-player.js && node --check dist/audio-library.js && node --check dist/cloud-client.js && node --check dist/migration.js && node --check server/classroom-api.js",
-    "test": "node --test tests/cloud-accounts.test.js tests/cloud-client.test.js"
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@edgeone/pages-blob": "0.0.19"
