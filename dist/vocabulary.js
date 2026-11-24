@@ -1,11 +1,14 @@
 // Round IDs are immutable: saving, importing or merging a device cannot count a round twice.
-export const vocabularyState = () => ({ version: 1, known: [], rounds: {}, banks: [] });
+export const vocabularyState = () => ({ version: 1, known: [], unfamiliar: [], rounds: {}, banks: [] });
 const idOf = lesson => lesson.id || `legacy_${lesson.startedAt}_${lesson.grade}`;
 export const repetitionCount = (profile, word) => Math.min(10, profile.vocabulary?.rounds[word]?.length || 0);
 
 export function reconcileVocabulary(profile) {
   const previous = profile.vocabulary || vocabularyState();
   const known = new Set(previous.known);
+  // Pending includes untouched words. Only actual screening answers or training
+  // are evidence that a word has already been screened.
+  const unfamiliar = new Set(previous.unfamiliar || []);
   const pending = new Set(profile.pending || []);
   const rounds = new Map(Object.entries(previous.rounds).map(([word, ids]) => [word, new Set(ids)]));
   const addRound = (words, id, skipped = []) => {
@@ -18,8 +21,9 @@ export function reconcileVocabulary(profile) {
   };
   for (const lesson of [profile.lesson, ...(profile.history || [])].filter(Boolean)) {
     for (const [word, correct] of Object.entries(lesson.seen || {})) {
-      if (correct) known.add(word); else pending.add(word);
+      if (correct) known.add(word); else {pending.add(word);unfamiliar.add(word);}
     }
+    for (const word of lesson.trained) unfamiliar.add(word);
     for (const word of [...lesson.picked, ...lesson.trained]) pending.add(word);
     if (!lesson.completedAt) continue;
     addRound(lesson.trained, `study:${idOf(lesson)}`);
@@ -38,7 +42,7 @@ export function reconcileVocabulary(profile) {
     if (ids.size >= 10) learned.add(word);
     else if (!known.has(word) && ids.size) review.push(word);
   }
-  profile.vocabulary = { version: 1, known: [...known],
+  profile.vocabulary = { version: 1, known: [...known], unfamiliar: [...unfamiliar],
     rounds: Object.fromEntries([...rounds].map(([word, ids]) => [word, [...ids].sort().slice(0, 10)])),
     banks: [...new Set(previous.banks)] };
   profile.learned = [...learned];

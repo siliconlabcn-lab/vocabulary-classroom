@@ -65,16 +65,16 @@ export function recommendation(s) {
   return Math.min(TRIAL_BANKS.length - 1, Math.max(0, GRADES[s.grade].bank + bankDelta));
 }
 
-export function beginScreen(s, reference = s.bank, pending = [], learned = [], unit = '') {
+export function beginScreen(s, reference = s.bank, unfamiliar = [], learned = [], unit = '', scopedWords) {
   const bank = bankFor(reference);
   if (!bank) return;
-  const words = unit ? bank.words.filter(word => bank.units?.[unit]?.includes(word.en)) : bank.words;
+  const words = scopedWords || (unit ? bank.words.filter(word => bank.units?.[unit]?.includes(word.en)) : bank.words);
   s.definitions = { ...s.definitions, ...Object.fromEntries(bank.words.map(word => [word.en, word.zh])) };
   s.bank = bank.id;
   s.bankUnit = unit;
   const wanted = new Set(words.map(word => word.en));
   const excluded = new Set([...learned, ...s.trained]);
-  s.picked = [...new Set([...pending, ...s.picked])].filter(word =>
+  s.picked = [...new Set(unfamiliar)].filter(word =>
     !excluded.has(word) && wanted.has(word));
   const skipped = new Set([...excluded, ...s.picked, ...Object.keys(s.seen)]);
   const wrong = new Set(Object.keys(s.diagnostic).filter(word => !s.diagnostic[word]));

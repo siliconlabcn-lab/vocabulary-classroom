@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyProfile, mergeProfiles, validateProfile } from '../dist/profile-data.js';
-import { recordVocabulary, prepareScreen } from '../dist/profiles.js';
+import { recordVocabulary, prepareScreen, openedBanks, bankProgress } from '../dist/profiles.js';
 import { startLesson, startVaultReview, chooseTraining, judge, beginDaily, move, deferWord } from '../dist/lesson.js';
 import { repetitionCount, reconcileVocabulary } from '../dist/vocabulary.js';
 import { bankFor } from '../dist/words.js';
 import { dailyVocabulary, classroomDay } from '../dist/daily-sheet.js';
 
 function completeStudy(profile, word='apple') {
-  const s=startLesson(1);s.trained=[word];move(s,'post',[word]);profile.lesson=s;
+  const s=startLesson(1);s.bank='trial-0';s.trained=[word];move(s,'post',[word]);profile.lesson=s;
   judge(s,true);recordVocabulary(profile,s);return s;
 }
 function review(profile, words=['apple']) {
@@ -16,7 +16,7 @@ function review(profile, words=['apple']) {
   while(s.stage==='daily')judge(s,true);
   recordVocabulary(profile,s);return s;
 }
-test('known screening enters the vault; unknown and untouched bank words remain pending across courses and devices',()=>{
+test('resume screens only untouched words; previous unknown answers remain candidates across courses and devices',()=>{
   const p=emptyProfile();p.lesson=startLesson(1);
   prepareScreen(p,p.lesson,'trial-0');
   assert.equal(p.pending.length,bankFor('trial-0').words.length);
@@ -26,9 +26,48 @@ test('known screening enters the vault; unknown and untouched bank words remain 
   const copied=validateProfile(JSON.parse(JSON.stringify(p)));
   const next=startLesson(1);copied.history.push(copied.lesson);copied.lesson=next;
   prepareScreen(copied,next,'trial-0');
-  assert.equal(next.stage,'screenReady');assert.equal(next.queue.length,0);
-  assert.equal(next.picked.length,bankFor('trial-0').words.length-1);
+  assert.equal(next.stage,'screen');assert.equal(next.queue.length,bankFor('trial-0').words.length-2);
+  assert.equal(next.picked.length,1);
   assert.ok(next.picked.includes(unknown));assert.ok(!next.picked.includes(known));
+  assert.ok(!next.queue.includes(known));assert.ok(!next.queue.includes(unknown));
+  const row=openedBanks(copied)[0];assert.equal(row.bank.id,'trial-0');
+  assert.equal(row.unseen.length,46);assert.deepEqual(row.unfamiliar,[unknown]);assert.equal(row.removed,1);
+});
+test('old inflated pending and picked lists do not turn untouched words into screened unknowns',()=>{
+  const p=emptyProfile();delete p.vocabulary.unfamiliar;
+  const s=startLesson(1);s.bank='trial-0';p.lesson=s;
+  const words=bankFor('trial-0').words.map(word=>word.en);
+  p.pending=[...words];s.picked=words.slice(1);s.seen={apple:true,banana:false};move(s,'screenReady');
+  recordVocabulary(p,s);
+  assert.deepEqual(p.vocabulary.unfamiliar,['banana']);assert.deepEqual(s.picked,['banana']);
+  const next=startLesson(1);p.history.push(s);p.lesson=next;prepareScreen(p,next,'trial-0');
+  assert.equal(next.queue.length,46);assert.deepEqual(next.picked,['banana']);assert.ok(next.queue.includes('blue'));
+});
+test('remaining banks remove already studied words and preserve untouched words independently from known unknowns',()=>{
+  const p=emptyProfile(),s=completeStudy(p);s.bank='trial-0';s.seen={banana:true,blue:false};recordVocabulary(p,s);
+  const row=openedBanks(p)[0];assert.equal(row.bank.id,'trial-0');assert.equal(row.removed,2);
+  assert.ok(!row.remaining.includes('apple'));assert.ok(!row.remaining.includes('banana'));
+  assert.deepEqual(row.unfamiliar,['blue']);assert.ok(row.unseen.includes('red'));
+  const next=startLesson(1);p.history.push(s);p.lesson=next;prepareScreen(p,next,'trial-0');
+  assert.ok(!next.queue.includes('apple'));assert.ok(!next.queue.includes('blue'));assert.ok(next.queue.includes('red'));
+});
+test('stale devices cannot erase screening decisions or infer decisions from their pending lists',()=>{
+  const p=emptyProfile();p.lesson=startLesson(1);prepareScreen(p,p.lesson,'trial-0');
+  const stale=structuredClone(p);judge(p.lesson,false);recordVocabulary(p,p.lesson);
+  const merged=mergeProfiles([p,stale,stale]);const next=startLesson(1);merged.history.push(merged.lesson);merged.lesson=next;
+  prepareScreen(merged,next,'trial-0');assert.deepEqual(next.picked,['apple']);assert.equal(next.queue.length,47);
+  assert.equal(repetitionCount(merged,'apple'),0);
+});
+test('opened unit scopes share one bank entry and continuing their union does not expand to the full bank',()=>{
+  const p=emptyProfile(),bank=bankFor('pep-primary-all-2022');const units=Object.keys(bank.units);
+  // Use two real scopes and verify the same bank is grouped once, including after cloud validation.
+  p.lesson=startLesson(1);prepareScreen(p,p.lesson,bank.id,units[0]);judge(p.lesson,false);recordVocabulary(p,p.lesson);
+  const first=openedBanks(p)[0];assert.equal(first.total,new Set(bank.units[units[0]]).size);
+  const restored=validateProfile(p);const next=startLesson(1);restored.history.push(restored.lesson);restored.lesson=next;
+  prepareScreen(restored,next,bank.id,first.scopes);recordVocabulary(restored,next);
+  assert.equal(openedBanks(restored).length,1);assert.ok(!restored.vocabulary.banks.includes(JSON.stringify([bank.id,''])));
+  assert.equal(bankProgress(restored,bank.id,first.scopes).total,first.total);
+  if(units[1]){prepareScreen(restored,next,bank.id,units[1]);const union=openedBanks(restored);assert.equal(union.length,1);assert.equal(union[0].total,new Set([...bank.units[units[0]],...bank.units[units[1]]]).size);}
 });
 test('selected unit is isolated; another bank does not pull unrelated pending words into the lesson',()=>{
   const p=emptyProfile();p.pending=['intuition'];p.lesson=startLesson(1);

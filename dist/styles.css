@@ -235,6 +235,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .vault-libraries .pills > span { max-width: 100%; overflow-wrap: anywhere; font-size: 16px; }
 .vault-libraries .pills small { font-size: 14px; }
 .vault-libraries summary { font-size: 16px; }
+.pending-banks { display: grid; gap: 12px; }
+.pending-bank { border: 1px solid var(--line); border-radius: 12px; background: white; padding: 16px; min-width: 0; }
+.pending-bank .bank-title { background: none; border: 0; padding: 0; text-align: left; color: var(--blue); font: inherit; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.pending-bank p { margin: 8px 0; }
 .vault-libraries .pills button { display: block; font-size: 14px; min-height: 40px; }
 .library-search { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
 .library-search input { min-height: 44px; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; }

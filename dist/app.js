@@ -3,15 +3,15 @@ import { RECORDINGS } from './recordings.js?v=20261123';
 import { englishRecording, chineseRecording } from './audio-library.js?v=20261123';
 import { playPronunciation, stopPronunciation } from './audio-player.js';
 import { accountName, registeredKey, validAccountName, verifyPassword } from './accounts.js';
-import { ACCOUNT_IDS, LEGACY_STORAGE, PROFILE_STORAGE, newProfile, openProfiles, recordVocabulary, prepareScreen } from './profiles.js?v=vault-20261123';
-import { cloudRequest, openCloudProfile } from './cloud-client.js?v=vault-20261123';
-import { mergeProfiles, validateProfile, lessonId } from './profile-data.js?v=vault-20261123';
-import { repetitionCount } from './vocabulary.js?v=vault-20261123';
+import { ACCOUNT_IDS, LEGACY_STORAGE, PROFILE_STORAGE, newProfile, openProfiles, recordVocabulary, prepareScreen, openedBanks, bankProgress } from './profiles.js?v=banks-20261124';
+import { cloudRequest, openCloudProfile } from './cloud-client.js?v=banks-20261124';
+import { mergeProfiles, validateProfile, lessonId } from './profile-data.js?v=banks-20261124';
+import { repetitionCount } from './vocabulary.js?v=banks-20261124';
 import { classroomDay, dailyVocabulary } from './daily-sheet.js';
 import {
   ACTIVITY, BOX_STAGES, DRILLS, STAGES, STAGE_LABELS, beginDaily, chooseTraining,
   createPlan, deferWord, follow, groupFor, judge, move, recommendation, startLesson, startVaultReview,
-} from './lesson.js?v=vault-20261123';
+} from './lesson.js?v=banks-20261124';
 
 const root = document.querySelector('#classroom');
 const sidebar = document.querySelector('#sidebar');
@@ -48,6 +48,7 @@ let s = null;
 let showHome = true;
 let showReview = false;
 let libraryQuery = '';
+let pendingBank = null;
 let sheetDay = classroomDay();
 let reveal = false;
 let clock;
@@ -286,13 +287,14 @@ function studentRecords() {
 function vocabularyPanel() {
   const buckets = [
     ['词汇小金库', prefs.learned, '筛词时已认识，或累计完成 10 轮学习与复习的词。', 'gold'],
-    ['待学习的词库', prefs.pending, '不会、没想起、未筛选和未选入本轮的词都会保留，下次选同一词库可直接开练。', 'pending'],
+    ['待学习的词库', prefs.pending, '按已开课的词库继续：未筛选的词还要筛选，已筛选不会的词可以直接选入新课。已认识或已学过的词会自动排除。', 'pending'],
     ['待复习巩固', prefs.review, '完整学完新课记 1 次；每完成一轮复习再记 1 次，累计 10 次自动存入小金库。', 'review'],
   ];
   const query = libraryQuery.trim().toLowerCase();
   return `<section class="panel vocabulary-panel" id="my-vocabulary"><div class="section-heading"><div><h2>我的词汇小金库</h2><p>每个学员独立保存，换设备登录后可继续积累。</p></div></div>
-    <form id="library-search" class="library-search"><label class="field">查找词汇<input name="query" value="${escape(libraryQuery)}" placeholder="输入英文或中文释义" maxlength="100"></label><button type="submit" class="secondary">查找</button></form>
+    <form id="library-search" class="library-search"><label class="field">查找词库或词汇<input name="query" value="${escape(libraryQuery)}" placeholder="输入词库名、英文或中文" maxlength="100"></label><button type="submit" class="secondary">查找</button></form>
     <div class="libraries vault-libraries">${buckets.map(([label, words, text, key])=>{
+      if(key==='pending')return `<details class="library-pending" open><summary><span>${label}</span><strong>${words.length} 词</strong></summary><p>${text}</p>${pendingBankCards(query)}</details>`;
       const filtered=words.filter(word=>!query || word.toLowerCase().includes(query) || wordFor(word).zh.toLowerCase().includes(query));
       return `<details class="library-${key}" ${query?'open':''}><summary><span>${label}</span><strong>${words.length} 词</strong></summary><p>${text}</p>
         ${filtered.length?`<div class="pills">${filtered.slice(0,60).map(word=>`<span>${escape(word)} <small>${escape(wordFor(word).zh)}${key==='review'?` · ${repetitionCount(prefs,word)} / 10 次`:''}</small>${key==='review'?button('复习此词','review-word','card-link',`data-word="${escape(word)}" aria-label="复习 ${escape(word)}"`):''}</span>`).join('')}</div>`:'<p>暂无词汇。</p>'}
@@ -301,6 +303,41 @@ function vocabularyPanel() {
     ${prefs.review.length?`<form id="vault-review" class="choice-actions"><label class="field">本轮复习词数<input type="number" name="count" min="1" max="${prefs.review.length}" value="${Math.min(10,prefs.review.length)}" required inputmode="numeric"></label><button class="primary" type="submit">开始一轮巩固</button><p>优先复习累计次数较少的词。</p></form>`:''}
     ${prefs.reviewSession && !prefs.reviewSession.completedAt ? button('继续未完成的巩固','resume-vault','secondary') : ''}
   </section>`;
+}
+
+function pendingBankCards(query = '') {
+  const banks=openedBanks(prefs).filter(item=>!query || item.bank.label.toLowerCase().includes(query) || item.remaining.some(word=>word.toLowerCase().includes(query) || wordFor(word)?.zh.toLowerCase().includes(query)));
+  return banks.length?`<div class="pending-banks">${banks.map(item=>`<div class="pending-bank">
+    <button type="button" class="bank-title" data-action="pending-bank" data-bank="${escape(item.bank.id)}">${escape(item.bank.label)}</button>
+    <p>${item.scopes.includes('')?'整册 / 全词库':`已开课范围：${item.scopes.map(escape).join('、')}`}</p>
+    <p><strong>剩余 ${item.remaining.length} 词</strong> · 尚未筛选 ${item.unseen.length} 词 · 已筛选不会 ${item.unfamiliar.length} 词</p>
+    <p class="local-note">已排除已认识或已学过的 ${item.removed} 词</p>
+    ${button('打开词库表','pending-bank','secondary',`data-bank="${escape(item.bank.id)}"`)}</div>`).join('')}</div>`:'<p>暂无符合条件的已开课词库。请从“老师开新课”选择词库。</p>';
+}
+
+function pendingBankPage() {
+  const item=openedBanks(prefs).find(item=>item.bank.id===pendingBank);
+  if(!item)return `${intro('待学习的词库','暂无该词库的开课记录','请返回首页选择词库。')}${button('返回词库列表','back-banks','secondary')}`;
+  return `${intro('待学习的词库',item.bank.label,'继续使用同一份词库。已认识或已学过的词已排除，只筛选之前没有筛过的词。')}
+    <div class="metrics"><div><span>尚未筛选</span><strong>${item.unseen.length}<small> 词</small></strong></div><div><span>已筛选不会</span><strong>${item.unfamiliar.length}<small> 词</small></strong></div><div><span>已认识或已学过</span><strong>${item.removed}<small> 词</small></strong></div></div>
+    <section class="panel"><h2>这份词库的剩余学习安排</h2><p>原范围 ${item.total} 词，排除已认识或已学过的词后，剩余 ${item.remaining.length} 词。</p>
+    <p>尚未筛选的词继续判断“认识 / 不会”；已筛选不会的词保留为候选生词，直接设置本轮学习词数。</p>
+    <div class="buttons">${button('继续筛选未筛词汇','continue-bank','primary',`data-bank="${escape(item.bank.id)}" ${item.unseen.length?'':'disabled'}`)}
+    ${button('学习已筛生词','train-bank','secondary',`data-bank="${escape(item.bank.id)}" ${item.unfamiliar.length?'':'disabled'}`)}</div></section>
+    ${button('返回词库列表','back-banks','secondary')}`;
+}
+
+function continueBank(reference, trainingOnly = false) {
+  const item=openedBanks(prefs).find(item=>item.bank.id===reference);
+  if(!item || !(trainingOnly?item.unfamiliar.length:item.remaining.length))return;
+  // Rebuild from persisted decisions, so an old unfinished screening can resume
+  // without treating untouched words as unknown or repeating answered words.
+  if(prefs.lesson)prefs.history.unshift(prefs.lesson);
+  s=startLesson(prefs.grade);prefs.lesson=s;
+  prepareScreen(prefs,s,reference,item.scopes);
+  if(trainingOnly)move(s,'screenReady');
+  prefs.preferredBank=reference;pendingBank=null;showHome=false;showReview=false;
+  update({jump:true});
 }
 
 function openVault(words) {
@@ -414,7 +451,7 @@ function bankPicker(defaultRef, buttonLabel, allowAuto = false) {
 }
 
 function chooseBank() {
-  return `${intro('学前筛词', '选择学习词库', '筛词结果会保存。选过的词库，下次直接从待学习的词库中选择本轮词数。')}
+  return `${intro('学前筛词', '选择学习词库', '只筛选之前没有筛过的词，已经筛选不会的词会保留为候选生词。')}
     <section class="panel">${bankPicker(s.bank, '继续筛词 →')}</section>`;
 }
 
@@ -451,8 +488,10 @@ function trainingChoice() {
 }
 
 function screenReady() {
-  return `${intro('待学习的词库', '选择本轮学习词数', '认识的词已存入小金库；其余词汇已保留，不用重复筛词。')}
-    ${s.picked.length ? trainingChoice() : '<section class="panel"><p>当前范围没有待学习词汇，可到“复习巩固”继续积累。</p></section>'}
+  const progress=bankProgress(prefs,s.bank,s.bankScopes || [s.bankUnit || '']);
+  return `${intro('待学习的词库', '选择本轮学习词数', '只从已经筛选不会的生词中选择。尚未筛选的词留在原词库，下次继续筛选。')}
+    ${s.picked.length ? trainingChoice() : '<section class="panel"><p>当前还没有已筛选不会的生词，可继续筛选尚未判断的词。</p></section>'}
+    ${progress?.unseen.length?`<section class="panel"><p>本范围还有 ${progress.unseen.length} 个词尚未筛选，暂不当作生词。</p>${button('继续筛选未筛词汇','resume-screen','secondary')}</section>`:''}
     ${button('前往复习巩固','review-hub','secondary')}
     ${button('更换词库继续筛词', 'choose-bank', 'secondary')}`;
 }
@@ -589,7 +628,7 @@ function render() {
   accountToggle.textContent = '退出登录';
   soundToggle.textContent = `自动播报 · ${prefs.auto ? '开' : '关'}`;
   soundToggle.setAttribute('aria-pressed', prefs.auto);
-  if (showHome) root.innerHTML = showReview ? reviewHub() : home();
+  if (showHome) root.innerHTML = pendingBank ? pendingBankPage() : showReview ? reviewHub() : home();
   else {
     root.innerHTML = ({ checkReport, plan, report, empty, screenReady, chooseBank, reviewDone }[s.stage] || exercise)();
     if (busy) setBusy(true);
@@ -776,6 +815,7 @@ document.addEventListener('click', async event => {
       showHome = true;
       showReview = false;
       libraryQuery = '';
+      pendingBank = null;
       paper.replaceChildren();
       clearTimeout(toast);
       notice.classList.remove('visible');
@@ -810,6 +850,7 @@ document.addEventListener('click', async event => {
       else playRecordings(['apple', 'friend'].map(englishRecording).filter(Boolean));
       break;
     case 'start':
+      pendingBank = null;
       showReview = false;
       if (prefs.lesson) prefs.history.unshift(prefs.lesson);
       s = startLesson(prefs.grade);
@@ -827,13 +868,21 @@ document.addEventListener('click', async event => {
       update({ jump: true });
       break;
     case 'home':
+      pendingBank = null;
       s = prefs.lesson;
       showHome = true;
       showReview = false;
       update({ autoplay: false, jump: true });
       break;
     case 'review-hub':
-      showHome=true;showReview=true;update({autoplay:false,jump:true});break;
+      pendingBank=null;showHome=true;showReview=true;update({autoplay:false,jump:true});break;
+    case 'pending-bank':
+      pendingBank=target.dataset.bank;showHome=true;update({autoplay:false,jump:true});break;
+    case 'back-banks':
+      pendingBank=null;showHome=true;update({autoplay:false,jump:true});document.querySelector('.library-pending')?.scrollIntoView({block:'start'});break;
+    case 'continue-bank':
+    case 'train-bank':
+      continueBank(target.dataset.bank,target.dataset.action==='train-bank');break;
     case 'open-vocabulary':
       document.querySelector('#my-vocabulary')?.scrollIntoView({block:'start',behavior:'smooth'});break;
     case 'review-word':
@@ -862,8 +911,9 @@ document.addEventListener('click', async event => {
       update();
       break;
     case 'finish-screen':
-      s.picked=[...new Set([...s.picked,...s.queue.slice(s.pos)])].filter(word=>prefs.pending.includes(word));
       move(s,'screenReady');update({autoplay:false,jump:true});break;
+    case 'resume-screen':
+      prepareScreen(prefs,s,s.bank,s.bankScopes || s.bankUnit);update({jump:true});break;
     case 'choose-count': {
       const field = document.querySelector('#training-choice input');
       field?.scrollIntoView({ block: 'center' });

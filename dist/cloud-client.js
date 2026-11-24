@@ -1,4 +1,4 @@
-import { mergeProfiles } from './profile-data.js?v=vault-20261123';
+import { mergeProfiles } from './profile-data.js?v=banks-20261124';
 
 export async function cloudRequest(action, body, options={}) {
   let response;
