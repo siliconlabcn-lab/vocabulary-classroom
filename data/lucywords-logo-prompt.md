@@ -1,6 +1,6 @@
-# LucyWords 柯基品牌图
+# Lucky AI学 柯基品牌图
 
-日期：2026-11-25。使用内置 image_gen 图像生成工具。生成后原样复制 PNG，未使用 CLI。页面上的品牌文字由 HTML 排版。
+日期：2026-11-25。使用内置 image_gen 图像生成工具。生成后原样复制 PNG，未使用 CLI。页面上的品牌文字由 HTML 排版。用户随后将品牌名更正为“Lucky AI学”，图像本身不含文字，原图案继续使用；以下保留最初生成图案的原始提示词。
 
 最终资产：dist/assets/lucywords-corgi.png
 

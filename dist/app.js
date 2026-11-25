@@ -198,7 +198,7 @@ function login() {
     <p><a href="https://wordclassroom.cn/">进入正式课堂 wordclassroom.cn</a></p>
     <p>如果以前在这个网址学习，请先<a href="migration.html">导出本机旧档案</a>，再到正式课堂导入。</p>
   </section>`;
-  return `<div class="login-layout"><section class="login-story"><span class="edition-label">LUCYWORDS · STUDY CLUB</span><img src="assets/lucywords-corgi.png" alt="戴眼镜的 LucyWords 柯基学习伙伴" width="210" height="210"><h1>让记住的单词，<br>成为你的底气。</h1><p>专注跟读，主动回忆。<br>把每一次练习，变成看得见的积累。</p><div class="study-tags"><span>听音跟读</span><span>主动回忆</span><span>长期积累</span></div></section><section class="login-panel">
+  return `<div class="login-layout"><section class="login-story"><span class="edition-label">Lucky AI学 · STUDY CLUB</span><img src="assets/lucywords-corgi.png" alt="戴眼镜的 Lucky AI学 柯基学习伙伴" width="210" height="210"><h1>让记住的单词，<br>成为你的底气。</h1><p>专注跟读，主动回忆。<br>把每一次练习，变成看得见的积累。</p><div class="study-tags"><span>听音跟读</span><span>主动回忆</span><span>长期积累</span></div></section><section class="login-panel">
     ${intro('单词练习室', registering ? '注册学员账户' : '学员登录',
       registering ? '设置登录姓名和密码，建立自己的学习档案。' : '输入注册时使用的姓名和密码。')}
     <form id="account-form" class="account-form">
@@ -375,7 +375,7 @@ function reviewDone() {
 
 function home() {
   const gold=prefs.learned.length, pending=prefs.pending.length, review=prefs.review.length;
-  return `<section class="welcome"><div class="welcome-copy"><span class="eyebrow">LUCYWORDS · 学员 ${escape(account.entry.name)}</span><h1>每天积累一点，<br>让记忆更有力量。</h1><p>听清一个词，主动回忆一次。<br>你的每一份积累，都在这里被认真记录。</p><div class="buttons">${button('开始复习巩固','page','primary',`data-page="review"`)}${button('进入学习准备','page','secondary',`data-page="prepare"`)}</div></div><div class="memory-note" aria-hidden="true"><span>THE ART OF REMEMBERING</span><strong>Learn.<br>Recall.<br>Remember.</strong><em>每一次回忆，都是进步。</em></div></section>
+  return `<section class="welcome"><div class="welcome-copy"><span class="eyebrow">Lucky AI学 · 学员 ${escape(account.entry.name)}</span><h1>每天积累一点，<br>让记忆更有力量。</h1><p>听清一个词，主动回忆一次。<br>你的每一份积累，都在这里被认真记录。</p><div class="buttons">${button('开始复习巩固','page','primary',`data-page="review"`)}${button('进入学习准备','page','secondary',`data-page="prepare"`)}</div></div><div class="memory-note" aria-hidden="true"><span>THE ART OF REMEMBERING</span><strong>Learn.<br>Recall.<br>Remember.</strong><em>每一次回忆，都是进步。</em></div></section>
   <section class="panel home-vault"><div class="section-heading"><div><span class="eyebrow">YOUR WORD COLLECTION</span><h2>我的词汇小金库</h2><p>每一个记住的词，都是下一步的起点。</p></div>${button('查看小金库','page','secondary',`data-page="vault"`)}</div>
   <div class="collection-stats"><button data-action="page" data-page="vault"><span>已学会的词汇</span><strong>${gold}<small> 词</small></strong><em>已认识，或累计巩固 10 轮</em></button><button data-action="page" data-page="pending"><span>等待探索的词汇</span><strong>${pending}<small> 词</small></strong><em>按原词库继续筛选与学习</em></button><button data-action="page" data-page="review"><span>正在巩固的词汇</span><strong>${review}<small> 词</small></strong><em>一步一步，走向长期记忆</em></button></div>
   ${gold?`<div class="pills">${wordPills(prefs.learned.slice(0,8))}</div>`:'<p class="empty-collection">从第一个词开始，建立属于你的词汇收藏。</p>'}</section>`;
