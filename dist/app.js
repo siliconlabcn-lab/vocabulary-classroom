@@ -8,6 +8,7 @@ import { cloudRequest, openCloudProfile } from './cloud-client.js?v=banks-202611
 import { mergeProfiles, validateProfile, lessonId } from './profile-data.js?v=banks-20261124';
 import { repetitionCount } from './vocabulary.js?v=banks-20261124';
 import { classroomDay, dailyVocabulary } from './daily-sheet.js';
+import { NAV_ITEMS, readRoute, routeHash } from './navigation.js?v=20261125';
 import {
   ACTIVITY, BOX_STAGES, DRILLS, STAGES, STAGE_LABELS, beginDaily, chooseTraining,
   createPlan, deferWord, follow, groupFor, judge, move, recommendation, startLesson, startVaultReview,
@@ -49,6 +50,7 @@ let showHome = true;
 let showReview = false;
 let libraryQuery = '';
 let pendingBank = null;
+let currentPage = 'home';
 let sheetDay = classroomDay();
 let reveal = false;
 let clock;
@@ -64,8 +66,7 @@ let lessonPrints = new Map();
 
 function syncStatus(text, okay) {
   syncText = text; syncOkay = okay;
-  const output=document.querySelector('#sync-status');
-  if(output){output.textContent=text;output.dataset.saved=String(okay);}
+  for(const output of document.querySelectorAll('[data-sync-status]')){output.textContent=text;output.dataset.saved=String(okay);}
 }
 
 function rememberLessons() {
@@ -80,7 +81,8 @@ function openAccount(result) {
   account={key:cloud.key,entry:{name:result.user.name,profile:cloud.profile},id:result.user.id};
   prefs=account.entry.profile;recordVocabulary(prefs,prefs.lesson);s=prefs.lesson;rememberLessons();
   if(result.needsUpload)cloud.save(prefs,true);
-  showHome=true;formName='';registering=false;
+  const route=readRoute(location.hash);currentPage=route.page==='classroom'?'home':route.page;pendingBank=route.bank;
+  showHome=true;showReview=currentPage==='review';formName='';registering=false;
   update({autoplay:false,jump:true});
 }
 
@@ -164,18 +166,30 @@ function playWord() {
 function side() {
   sidebar.hidden = !account;
   if (!account) return;
+  const active=showHome?currentPage:(s?.kind==='vaultReview' || ['review','post'].includes(groupFor(s?.stage))?'review':'prepare');
+  const icons={book:'M4 5h6a3 3 0 0 1 3 3v13a4 4 0 0 0-4-3H4z M20 5h-4a3 3 0 0 0-3 3v13a4 4 0 0 1 4-3h3z',star:'m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z',library:'M4 4v16 M9 4v16 M14 4v16 M18 4l3 15',clock:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',print:'M6 9V3h12v6 M6 17H3V9h18v8h-3 M6 14h12v7H6z',records:'M7 3h10v3H7z M7 5H4v16h16V5h-3 M8 11h8 M8 15h6'};
+  sidebar.innerHTML=`<div class="nav-caption">MY STUDY DESK</div>${button('学员首页','page','nav-home',`data-page="home" ${active==='home'?'aria-current="page"':''}`)}
+    <nav class="study-nav" aria-label="学习功能">${NAV_ITEMS.map(item=>`<button type="button" class="nav-item ${active===item.id?'selected':''}" data-action="page" data-page="${item.id}" ${active===item.id?'aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[item.icon]}"/></svg><span>${item.label}</span></button>`).join('')}</nav>
+    <div class="nav-profile"><span class="profile-avatar">${escape(account.entry.name.slice(0,1))}</span><div><strong>${escape(account.entry.name)}</strong><p data-sync-status data-saved="${syncOkay}">${escape(syncText)}</p></div></div>`;
+}
+
+function classroomFlow() {
   const active = showHome ? -1 : s.kind === 'vaultReview' ? 5 : STAGES.indexOf(groupFor(s.stage));
   const hasStats = s && !showHome;
   const completed = hasStats && (s.stage === 'reviewDone' || s.stage === 'report' && s.daily.every(day => day.completedAt));
   const wordCount = hasStats ? s.trained.length : 0;
-  sidebar.innerHTML = `
-    <div class="side-label">课堂流程</div>
+  return `<details class="classroom-flow panel" ${showHome?'open':''}><summary>课堂流程 <span>听音、跟读、回忆、巩固</span></summary>
     <ol class="steps">${STAGE_LABELS.map((label, i) => `
       <li class="${i === active && !completed ? 'active' : ''} ${i < active || completed ? 'done' : ''}" ${i === active && !completed ? 'aria-current="step"' : ''}>
         <span class="step-num">${i < active || completed ? '✓' : '0' + (i + 1)}</span><span>${label}</span>
       </li>`).join('')}</ol>
-    ${hasStats ? `<div class="side-summary"><span>${wordCount ? '本课训练' : '候选生词'}</span><strong>${wordCount || s.picked.length}<small> 词</small></strong></div>${button('← 返回学员首页','home','quiet back')}` : '<p class="side-hint">先找出生词，再开口练习。<br>课后用三次回忆巩固。</p>'}
-  `;
+    ${hasStats ? `<p class="flow-note">${wordCount?'本课训练':'候选生词'} ${wordCount || s.picked.length} 词 · 进度自动保存</p>` : '<p class="flow-note">先筛选新词，再分组跟读；用主动回忆和课后复习，把生词逐步记牢。</p>'}</details>`;
+}
+
+function openPage(page,bank=null) {
+  currentPage=page;pendingBank=bank;showHome=true;showReview=page==='review';libraryQuery='';
+  const hash=routeHash(page,bank);if(location.hash!==hash)history.pushState(null,'',hash);
+  update({autoplay:false,jump:true});
 }
 
 function login() {
@@ -184,7 +198,7 @@ function login() {
     <p><a href="https://wordclassroom.cn/">进入正式课堂 wordclassroom.cn</a></p>
     <p>如果以前在这个网址学习，请先<a href="migration.html">导出本机旧档案</a>，再到正式课堂导入。</p>
   </section>`;
-  return `<section class="login-panel">
+  return `<div class="login-layout"><section class="login-story"><span class="edition-label">LUCYWORDS · STUDY CLUB</span><img src="assets/lucywords-corgi.png" alt="戴眼镜的 LucyWords 柯基学习伙伴" width="210" height="210"><h1>让记住的单词，<br>成为你的底气。</h1><p>专注跟读，主动回忆。<br>把每一次练习，变成看得见的积累。</p><div class="study-tags"><span>听音跟读</span><span>主动回忆</span><span>长期积累</span></div></section><section class="login-panel">
     ${intro('单词练习室', registering ? '注册学员账户' : '学员登录',
       registering ? '设置登录姓名和密码，建立自己的学习档案。' : '输入注册时使用的姓名和密码。')}
     <form id="account-form" class="account-form">
@@ -200,7 +214,7 @@ function login() {
       </div>
     </form>
     <p class="login-guidance">学员登陆使用请点复习巩固，开新课请找老师</p>
-  </section>`;
+  </section></div>`;
 }
 
 async function submitAccount(form) {
@@ -275,33 +289,34 @@ function studentRecords() {
       ${button(lesson.completedAt ? '查看成绩' : '继续学习', 'record', 'secondary', `data-index="${index}"`)}</div>`;
   }).join('');
   return `<section class="panel account-storage">
-    <h2>我的云端档案</h2><p id="sync-status" role="status" data-saved="${syncOkay}">${escape(syncText)}</p>
+    <h2>我的云端档案</h2><p data-sync-status role="status" data-saved="${syncOkay}">${escape(syncText)}</p>
     <p>换设备后，用同一个姓名和密码登录。开始另一台设备的学习前，请先同步。</p>
     <div class="buttons">${button('同步记录','sync','secondary')}${button('导出备份','export-profile','secondary')}${button('导入旧记录','import-profile','secondary')}</div>
     <input type="file" id="profile-file" accept="application/json,.json" hidden>
     <p class="local-note"><a href="migration.html">临时网址旧记录迁移说明</a></p>
-  </section>${vocabularyPanel()}
-  <section class="panel"><h2>学习记录</h2>${summary || '<p>开始上课后，这里会保留课堂和成绩。</p>'}</section>`;
+  </section>
+  <section class="panel"><h2>课堂记录</h2>${summary || '<p>开始上课后，这里会保留课堂和成绩。</p>'}</section>`;
 }
 
-function vocabularyPanel() {
+function vocabularyPanel(mode='all') {
   const buckets = [
     ['词汇小金库', prefs.learned, '筛词时已认识，或累计完成 10 轮学习与复习的词。', 'gold'],
     ['待学习的词库', prefs.pending, '按已开课的词库继续：未筛选的词还要筛选，已筛选不会的词可以直接选入新课。已认识或已学过的词会自动排除。', 'pending'],
     ['待复习巩固', prefs.review, '完整学完新课记 1 次；每完成一轮复习再记 1 次，累计 10 次自动存入小金库。', 'review'],
-  ];
+  ].filter(bucket=>mode==='all' || bucket[3]===mode);
+  const heading={gold:'词汇小金库',pending:'待学习词库',review:'待复习巩固'}[mode] || '我的词汇小金库';
   const query = libraryQuery.trim().toLowerCase();
-  return `<section class="panel vocabulary-panel" id="my-vocabulary"><div class="section-heading"><div><h2>我的词汇小金库</h2><p>每个学员独立保存，换设备登录后可继续积累。</p></div></div>
+  return `<section class="panel vocabulary-panel" id="my-vocabulary"><div class="section-heading"><div><h2>${{gold:'已学会的词汇',pending:'已开课词库',review:'本轮复习安排'}[mode] || heading}</h2><p>每个学员独立保存，换设备登录后可继续积累。</p></div></div>
     <form id="library-search" class="library-search"><label class="field">查找词库或词汇<input name="query" value="${escape(libraryQuery)}" placeholder="输入词库名、英文或中文" maxlength="100"></label><button type="submit" class="secondary">查找</button></form>
     <div class="libraries vault-libraries">${buckets.map(([label, words, text, key])=>{
       if(key==='pending')return `<details class="library-pending" open><summary><span>${label}</span><strong>${words.length} 词</strong></summary><p>${text}</p>${pendingBankCards(query)}</details>`;
       const filtered=words.filter(word=>!query || word.toLowerCase().includes(query) || wordFor(word).zh.toLowerCase().includes(query));
-      return `<details class="library-${key}" ${query?'open':''}><summary><span>${label}</span><strong>${words.length} 词</strong></summary><p>${text}</p>
+      return `<details class="library-${key}" open><summary><span>${label}</span><strong>${words.length} 词</strong></summary><p>${text}</p>
         ${filtered.length?`<div class="pills">${filtered.slice(0,60).map(word=>`<span>${escape(word)} <small>${escape(wordFor(word).zh)}${key==='review'?` · ${repetitionCount(prefs,word)} / 10 次`:''}</small>${key==='review'?button('复习此词','review-word','card-link',`data-word="${escape(word)}" aria-label="复习 ${escape(word)}"`):''}</span>`).join('')}</div>`:'<p>暂无词汇。</p>'}
         ${filtered.length>60?`<p>显示前 60 / ${filtered.length} 词，可输入英文或中文查找其余词汇。</p>`:''}</details>`;
     }).join('')}</div>
-    ${prefs.review.length?`<form id="vault-review" class="choice-actions"><label class="field">本轮复习词数<input type="number" name="count" min="1" max="${prefs.review.length}" value="${Math.min(10,prefs.review.length)}" required inputmode="numeric"></label><button class="primary" type="submit">开始一轮巩固</button><p>优先复习累计次数较少的词。</p></form>`:''}
-    ${prefs.reviewSession && !prefs.reviewSession.completedAt ? button('继续未完成的巩固','resume-vault','secondary') : ''}
+    ${['all','review'].includes(mode) && prefs.review.length?`<form id="vault-review" class="choice-actions"><label class="field">本轮复习词数<input type="number" name="count" min="1" max="${prefs.review.length}" value="${Math.min(10,prefs.review.length)}" required inputmode="numeric"></label><button class="primary" type="submit">开始一轮巩固</button><p>优先复习累计次数较少的词。</p></form>`:''}
+    ${['all','review'].includes(mode) && prefs.reviewSession && !prefs.reviewSession.completedAt ? button('继续未完成的巩固','resume-vault','secondary') : ''}
   </section>`;
 }
 
@@ -359,23 +374,17 @@ function reviewDone() {
 }
 
 function home() {
-  return `
-    <section class="welcome">
-      <div class="welcome-copy">
-        <span class="eyebrow"><span class="dot"></span> 学员 ${escape(account.entry.name)}</span>
-        <h1>跟读、回忆，<br>把生词变成熟词。</h1>
-        <p>先摸清自己认识哪些词，再跟着陪练开口。从第一轮跟读到课后三天复习，都在这里完成。</p>
-        <div class="buttons">${button('复习巩固','review-hub')}${button('词汇小金库','open-vocabulary','secondary')}</div>
-        <p>已学会 ${prefs.learned.length} 词 · 待学习 ${prefs.pending.length} 词 · 待复习巩固 ${prefs.review.length} 词</p>
-      </div>
-      <div class="tiles" aria-hidden="true">
-        <div class="tile tile-back"><b>Recall.</b></div>
-        <div class="tile tile-front"><small>♪</small><b>Listen.</b><em>听音 · 跟读</em></div>
-        <span class="tile-check">✓</span>
-      </div>
-    </section>
+  const gold=prefs.learned.length, pending=prefs.pending.length, review=prefs.review.length;
+  return `<section class="welcome"><div class="welcome-copy"><span class="eyebrow">LUCYWORDS · 学员 ${escape(account.entry.name)}</span><h1>每天积累一点，<br>让记忆更有力量。</h1><p>听清一个词，主动回忆一次。<br>你的每一份积累，都在这里被认真记录。</p><div class="buttons">${button('开始复习巩固','page','primary',`data-page="review"`)}${button('进入学习准备','page','secondary',`data-page="prepare"`)}</div></div><div class="memory-note" aria-hidden="true"><span>THE ART OF REMEMBERING</span><strong>Learn.<br>Recall.<br>Remember.</strong><em>每一次回忆，都是进步。</em></div></section>
+  <section class="panel home-vault"><div class="section-heading"><div><span class="eyebrow">YOUR WORD COLLECTION</span><h2>我的词汇小金库</h2><p>每一个记住的词，都是下一步的起点。</p></div>${button('查看小金库','page','secondary',`data-page="vault"`)}</div>
+  <div class="collection-stats"><button data-action="page" data-page="vault"><span>已学会的词汇</span><strong>${gold}<small> 词</small></strong><em>已认识，或累计巩固 10 轮</em></button><button data-action="page" data-page="pending"><span>等待探索的词汇</span><strong>${pending}<small> 词</small></strong><em>按原词库继续筛选与学习</em></button><button data-action="page" data-page="review"><span>正在巩固的词汇</span><strong>${review}<small> 词</small></strong><em>一步一步，走向长期记忆</em></button></div>
+  ${gold?`<div class="pills">${wordPills(prefs.learned.slice(0,8))}</div>`:'<p class="empty-collection">从第一个词开始，建立属于你的词汇收藏。</p>'}</section>`;
+}
+
+function preparePage() {
+  return `${intro('READY TO LEARN','准备上课','选好学段和词库，和老师一起开启本轮学习。')}${classroomFlow()}
     <section class="setup">
-      <div class="section-heading"><div><h2>准备上课</h2><p>选一个学段。先播放示例，确认能听清。</p></div>${button('♪ 试听发音','sample','secondary')}</div>
+      <div class="section-heading"><div><h2>选择学段与词库</h2><p>选一个学段。先播放示例，确认能听清。</p></div>${button('♪ 试听发音','sample','secondary')}</div>
       <fieldset class="grades"><legend class="sr-only">选择学段</legend>
       ${GRADES.map((grade, index) => `
         <label class="grade"><input type="radio" name="grade" value="${index}" ${index === prefs.grade ? 'checked' : ''}>
@@ -388,12 +397,25 @@ function home() {
         </div>
       </div>
     </section>
-    ${dailyPrintPanel()}${studentRecords()}`;
+`;
+}
+
+function featurePage() {
+  if(pendingBank)return pendingBankPage();
+  switch(currentPage){
+    case 'prepare':return preparePage();
+    case 'vault':return `${intro('WORDS YOU KNOW','词汇小金库','认识的词与完成 10 轮积累的词，都在这里。')}${vocabularyPanel('gold')}`;
+    case 'pending':return `${intro('NEXT WORDS TO EXPLORE','待学习词库','从原来的词库接着学，只筛选之前未筛选的词。')}${vocabularyPanel('pending')}`;
+    case 'review':return reviewHub();
+    case 'print':return `${intro('YOUR STUDY SHEETS','课程打印','把当天的多节新课合并为一张词汇表，方便复习。')}${dailyPrintPanel()}`;
+    case 'records':return `${intro('EVERY STEP COUNTS','学习记录','查看课程、成绩与学习档案，继续上次的积累。')}${studentRecords()}`;
+    default:return home();
+  }
 }
 
 function dailyPrintPanel() {
   const sheet=dailyVocabulary(prefs,sheetDay,WORDS);
-  return `<section class="panel daily-print"><h2>当天课程合并打印</h2><p>将当天已完成的新课合并成一张词汇表，重复单词只列一次。</p>
+  return `<section class="panel daily-print"><h2>当天新课合并打印</h2><p>将当天已完成的新课合并成一张词汇表，重复单词只列一次。</p>
     <div class="print-options"><label class="field">上课日期（北京时间）<input id="sheet-day" type="date" value="${escape(sheetDay)}" required></label>
     <label class="field">打印内容<select id="daily-sheet-mode"><option value="both">中英文对照</option><option value="en">仅英文</option><option value="zh">仅中文</option></select></label></div>
     <p id="daily-sheet-summary">${sheet.lessonCount} 节已完成课程 · ${sheet.rows.length} 个词汇</p>
@@ -404,9 +426,8 @@ function dailyPrintPanel() {
 function reviewHub() {
   const records=[prefs.lesson,...prefs.history];
   const completed=records.map((lesson,index)=>({lesson,index})).filter(({lesson})=>lesson?.completedAt);
-  return `${intro('词汇积累小达人','复习巩固','从待复习巩固里继续练习，累计 10 轮即可存入词汇小金库。')}${vocabularyPanel()}
-    <section class="panel">${completed.length?completed.map(({lesson,index})=>`<div class="record"><div><strong>${recordDate.format(lesson.completedAt)} · ${lesson.trained.length} 个词汇</strong><p>已复习 ${lesson.daily.filter(day=>day.completedAt).length} 天</p></div>${button('复习这节课','review-record','secondary',`data-index="${index}"`)}</div>`).join(''):'<p>还没有已完成的课程。开新课请找老师。</p>'}</section>
-    ${dailyPrintPanel()}${button('返回学员首页','home','secondary')}`;
+  return `${intro('RECALL & RETAIN','待复习巩固','每一轮主动回忆，都让记忆更牢。累计 10 轮，自动存入词汇小金库。')}${vocabularyPanel('review')}
+    <section class="panel"><h2>按课程复习</h2>${completed.length?completed.map(({lesson,index})=>`<div class="record"><div><strong>${recordDate.format(lesson.completedAt)} · ${lesson.trained.length} 个词汇</strong><p>已复习 ${lesson.daily.filter(day=>day.completedAt).length} 天</p></div>${button('复习这节课','review-record','secondary',`data-index="${index}"`)}</div>`).join(''):'<p>还没有已完成的课程。开新课请找老师。</p>'}</section>`;
 }
 
 function intro(label, title, detail) {
@@ -619,6 +640,7 @@ document.querySelector('#recording-source').addEventListener('toggle', event => 
 });
 
 function render() {
+  if(account && !showHome && location.hash!=='#classroom')history.pushState(null,'','#classroom');
   side();
   document.body.classList.toggle('logged-out', !account);
   if (!account) {
@@ -628,9 +650,12 @@ function render() {
   accountToggle.textContent = '退出登录';
   soundToggle.textContent = `自动播报 · ${prefs.auto ? '开' : '关'}`;
   soundToggle.setAttribute('aria-pressed', prefs.auto);
-  if (showHome) root.innerHTML = pendingBank ? pendingBankPage() : showReview ? reviewHub() : home();
+  if (showHome) {
+    const label=NAV_ITEMS.find(item=>item.id===currentPage)?.label;
+    root.innerHTML=`${currentPage!=='home'?`<nav class="breadcrumbs" aria-label="当前位置">${button('学员首页','home','card-link')}<span>/</span><span>${label || '学习课堂'}</span>${pendingBank?'<span>/ 词库详情</span>':''}</nav>`:''}${featurePage()}`;
+  }
   else {
-    root.innerHTML = ({ checkReport, plan, report, empty, screenReady, chooseBank, reviewDone }[s.stage] || exercise)();
+    root.innerHTML = `${classroomFlow()}${({ checkReport, plan, report, empty, screenReady, chooseBank, reviewDone }[s.stage] || exercise)()}`;
     if (busy) setBusy(true);
   }
 }
@@ -796,6 +821,8 @@ document.addEventListener('click', async event => {
   const target = event.target.closest('[data-action]');
   if (!target) return;
   switch (target.dataset.action) {
+    case 'page':
+      openPage(target.dataset.page);break;
     case 'account-mode':
       formName = document.querySelector('#account-name').value;
       registering = !registering;
@@ -868,23 +895,20 @@ document.addEventListener('click', async event => {
       update({ jump: true });
       break;
     case 'home':
-      pendingBank = null;
-      s = prefs.lesson;
-      showHome = true;
-      showReview = false;
-      update({ autoplay: false, jump: true });
+      if(account)s=prefs.lesson;
+      openPage('home');
       break;
     case 'review-hub':
-      pendingBank=null;showHome=true;showReview=true;update({autoplay:false,jump:true});break;
+      openPage('review');break;
     case 'pending-bank':
-      pendingBank=target.dataset.bank;showHome=true;update({autoplay:false,jump:true});break;
+      openPage('pending',target.dataset.bank);break;
     case 'back-banks':
-      pendingBank=null;showHome=true;update({autoplay:false,jump:true});document.querySelector('.library-pending')?.scrollIntoView({block:'start'});break;
+      openPage('pending');break;
     case 'continue-bank':
     case 'train-bank':
       continueBank(target.dataset.bank,target.dataset.action==='train-bank');break;
     case 'open-vocabulary':
-      document.querySelector('#my-vocabulary')?.scrollIntoView({block:'start',behavior:'smooth'});break;
+      openPage('vault');break;
     case 'review-word':
       if(prefs.review.includes(target.dataset.word))openVault([target.dataset.word]);break;
     case 'resume-vault':
@@ -957,6 +981,17 @@ document.addEventListener('click', async event => {
       copyFeedback();
       break;
   }
+});
+
+window.addEventListener('popstate',()=>{
+  if(!account)return;
+  const route=readRoute(location.hash);
+  if(route.page==='classroom' && (s || prefs.lesson)){
+    s ||= prefs.lesson;showHome=false;pendingBank=null;
+  } else {
+    currentPage=route.page==='classroom'?'home':route.page;pendingBank=route.bank;showHome=true;showReview=currentPage==='review';
+  }
+  update({autoplay:false,jump:true});
 });
 
 document.addEventListener('keydown', event => {

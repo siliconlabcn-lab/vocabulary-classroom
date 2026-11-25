@@ -3,16 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f7f6f1">
+<meta name="theme-color" content="#12233e">
 <meta name="description" content="词汇积累小达人：词汇测评、跟读、回忆、复习巩固和每日词汇表。">
-<title>词汇积累小达人 · 单词练习室</title>
+<title>LucyWords 单词练习室｜词汇积累小达人</title>
+<link rel="icon" href="assets/lucywords-corgi.png" type="image/png">
 <link rel="stylesheet" href="styles.css?v=banks-20261124">
-<script type="module" src="app.js?v=banks-20261124"></script>
+<link rel="stylesheet" href="lucywords.css?v=20261125">
+<script type="module" src="app.js?v=lucywords-20261125"></script>
 </head>
 <body class="logged-out">
 <header class="top">
   <div class="bar">
-    <div class="brand"><span class="logo" aria-hidden="true">Aa</span><span>单词练习室</span><span class="brand-divider"></span><span class="brand-note">词汇积累小达人</span></div>
+    <button type="button" class="brand" data-action="home" aria-label="LucyWords 学员首页"><img class="brand-mascot" src="assets/lucywords-corgi.png" alt="LucyWords 柯基小狗标志" width="58" height="58"><span class="brand-copy"><strong>LucyWords <span>单词练习室</span></strong><span class="brand-note">｜词汇积累小达人</span></span></button>
     <div class="header-actions">
     <button type="button" class="quiet sound-toggle" data-action="sound" aria-pressed="true">自动播报 · 开</button>
     <button type="button" class="secondary" id="switch-account" data-action="switch">退出登录</button>
@@ -20,7 +22,7 @@
   </div>
 </header>
 <main class="layout">
-  <aside class="sidebar" aria-label="课堂进度" id="sidebar"></aside>
+  <aside class="sidebar" aria-label="学习功能导航" id="sidebar"></aside>
   <article class="content" id="classroom" aria-label="词汇课堂">
     <div class="login-panel" role="status"><h1>正在加载词库</h1><p>首次打开请稍候。若长时间未完成，请刷新网页。</p></div>
     <noscript>请在浏览器中启用 JavaScript 后重新打开网页。</noscript>
